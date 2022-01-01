@@ -42,25 +42,28 @@ CANVAS_HEIGHT = 60
 
 class ConwaysCA(CellularAutomaton):
     """ Cellular automaton with the evolution rules of conways game of life """
-    def __init__(self, canvas_width=CANVAS_WIDTH, canvas_height=CANVAS_HEIGHT, starting_width=STARTING_WIDTH, starting_height=STARTING_HEIGHT, initial_state=None):
+    def __init__(self, canvas_width=CANVAS_WIDTH, canvas_height=CANVAS_HEIGHT, starting_width=STARTING_WIDTH, starting_height=STARTING_HEIGHT, initial_state=None, parents=None):
         self.starting_width = starting_width
         self.starting_height = starting_height
         self.start_width = canvas_width / 2 - starting_width / 2
         self.start_height = canvas_height / 2 - starting_height / 2
         self.initial_state = initial_state
+        self.generation = None
         super().__init__(dimension=[canvas_width, canvas_height],
                          neighborhood=MooreNeighborhood(EdgeRule.FIRST_AND_LAST_CELL_OF_DIMENSION_ARE_NEIGHBORS))
 
         self.previous_steps = []
-        self.start_length = self.get_size()
+        self.max_size = 0
+        self.max_length = 0
+        self.reset_state = self.get_cells()
 
+    def hard_reset(self):
+        self.__init__(self._dimension[0], self._dimension[1], self.starting_width, self.starting_height, self.reset_state)
 
     def init_cell_state(self, index):  # pylint: disable=no-self-use
+        # If we have a predefined state then return it
         if self.initial_state:
             return self.initial_state[index].state
-
-        init = random.randint(0, 3) == 0
-        #init = max(.0, float(rand - 14))
 
         if index[0] < self.start_height or index[0] > (self.start_height + self.starting_height):
             return [0.0]
@@ -68,6 +71,7 @@ class ConwaysCA(CellularAutomaton):
         if index[1] < self.start_width or index[1] > (self.start_width + self.starting_width):
             return [0.0]
 
+        init = random.randint(0, 3) == 0
         return [init]
 
     def evolve_rule(self, last_cell_state, neighbors_last_states):
@@ -87,42 +91,47 @@ class ConwaysCA(CellularAutomaton):
 
     def evolve(self, times=1):
         """ Override the default evolve so I can process each step """
-        #print(convert_to_array(self.get_cells()))
         super().evolve(times)
 
         cells_as_array = self.convert_to_array(self.get_cells())
-        if cells_as_array in self.previous_steps and not self.is_empty(cells_as_array):
-            curr_length = self.get_size()
-            return curr_length
 
+        if cells_as_array in self.previous_steps:
+            return True
+
+        # Calculate largest modes
+        current_size = self.cell_count(cells_as_array)
+        self.max_size = current_size if current_size > self.max_size else self.max_size
+
+        current_length = self.get_length()
+        self.max_length = current_length if current_length > self.max_length else self.max_length
         self.previous_steps.append(cells_as_array)
-        return 0
+        return False
 
-    def get_size(self):
-        first_point = (-1,-1)
-        last_point = (-1, -1)
+    def get_length(self):
+        try:
+            cells = self.get_cells()
+            pts = []
+            for index in cells:
+                if cells[index].state[0]:
+                    pts.append(index)
 
-        cells = self.get_cells()
-        pts = []
-        for index in cells:
-            if cells[index].state[0]:
-                pts.append(index)
+            pts = np.array(pts)
 
-        pts = np.array(pts)
+            candidates = pts[spatial.ConvexHull(pts).vertices]
+            # get distances between each pair of candidate points
+            dist_mat = spatial.distance_matrix(candidates, candidates)
 
-        candidates = pts[spatial.ConvexHull(pts).vertices]
-        # get distances between each pair of candidate points
-        dist_mat = spatial.distance_matrix(candidates, candidates)
+            # get indices of candidates that are furthest apart
+            i, j = np.unravel_index(dist_mat.argmax(), dist_mat.shape)
 
-        # get indices of candidates that are furthest apart
-        i, j = np.unravel_index(dist_mat.argmax(), dist_mat.shape)
-
-        x, y = (candidates[i], candidates[j])
-        return ((x[0] - y[0])**2 + (x[1] - y[1])**2)**0.5
+            x, y = (candidates[i], candidates[j])
+            return ((x[0] - y[0])**2 + (x[1] - y[1])**2)**0.5
+        except:
+            return 0
 
     def get_full_state(self):
         # Get cell states include starting size
-        return self.get_cells(), (self.start_width, self.start_height, self.starting_width, self.starting_height)
+        return self, (self.start_width, self.start_height, self.starting_width, self.starting_height)
 
     @staticmethod
     def __count_alive_neighbours(neighbours):
@@ -143,9 +152,18 @@ class ConwaysCA(CellularAutomaton):
         return arr
 
     @staticmethod
-    def is_empty(game_cells):
-        return sum(map(sum, game_cells)) == 0
+    def cell_count(game_cells):
+        return sum(map(sum, game_cells))
 
+
+
+class GolWindow(CAWindow):
+    def print_process_info(self, evolve_duration, draw_duration, evolution_step):
+        self._draw_engine.fill_surface_with_color(((0, 0), (self._rect.width, 30)))
+        self._draw_engine.write_text((10, 5), "CA: " + "{0:.4f}".format(evolve_duration) + "s")
+        self._draw_engine.write_text((210, 5), "Display: " + "{0:.4f}".format(draw_duration) + "s")
+        self._draw_engine.write_text((430, 5), "Step: " + str(evolution_step))
+        self._draw_engine.write_text((660, 5), "Generation:" + str(self.generation))
 
 if __name__ == "__main__":
     CAWindow(cellular_automaton=ConwaysCA(),

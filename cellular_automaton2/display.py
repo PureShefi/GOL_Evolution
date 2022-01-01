@@ -82,9 +82,9 @@ class CAWindow:
         """
         super().__init__(*args, **kwargs)
         self._cellular_automaton = cellular_automaton
-        self.__rect = _Rect(left=0, top=30, width=window_size[0], height=window_size[1] - 30)
+        self._rect = _Rect(left=0, top=30, width=window_size[0], height=window_size[1] - 30)
         self.__calculate_cell_display_size(stretch_cells)
-        self.__draw_engine = PygameEngine(window_size) if draw_engine is None else draw_engine
+        self._draw_engine = PygameEngine(window_size) if draw_engine is None else draw_engine
         self.__state_to_color = self._get_cell_color if state_to_color_cb is None else state_to_color_cb
 
     def run(self,
@@ -123,14 +123,14 @@ class CAWindow:
     def __calculate_cell_display_size(self, stretch_cells):  # pragma: no cover
         grid_dimension = self._cellular_automaton.dimension
         if stretch_cells:
-            self.__cell_size = [self.__rect.width / grid_dimension[0],
-                                self.__rect.height / grid_dimension[1]]
+            self.__cell_size = [self._rect.width / grid_dimension[0],
+                                self._rect.height / grid_dimension[1]]
         else:
-            self.__cell_size = [int(self.__rect.width / grid_dimension[0]),
-                                int(self.__rect.height / grid_dimension[1])]
+            self.__cell_size = [int(self._rect.width / grid_dimension[0]),
+                                int(self._rect.height / grid_dimension[1])]
 
     def _redraw_dirty_cells(self):
-        self.__draw_engine.update_rectangles(list(self.__redraw_dirty_cells()))
+        self._draw_engine.update_rectangles(list(self.__redraw_dirty_cells()))
 
     def __redraw_dirty_cells(self):
         for coordinate, cell in self._cellular_automaton.cells.items():
@@ -152,16 +152,16 @@ class CAWindow:
         return list(map(operator.mul, self.__cell_size, coordinate))
 
     def __calculate_cell_position_on_screen(self, cell_pos):
-        return [self.__rect.left + cell_pos[0], self.__rect.top + cell_pos[1]]
+        return [self._rect.left + cell_pos[0], self._rect.top + cell_pos[1]]
 
     def __draw_cell_surface(self, surface_pos, cell_color):
-        return self.__draw_engine.fill_surface_with_color((surface_pos, self.__cell_size), cell_color)
+        return self._draw_engine.fill_surface_with_color((surface_pos, self.__cell_size), cell_color)
 
     def print_process_info(self, evolve_duration, draw_duration, evolution_step):
-        self.__draw_engine.fill_surface_with_color(((0, 0), (self.__rect.width, 30)))
-        self.__draw_engine.write_text((10, 5), "CA: " + "{0:.4f}".format(evolve_duration) + "s")
-        self.__draw_engine.write_text((310, 5), "Display: " + "{0:.4f}".format(draw_duration) + "s")
-        self.__draw_engine.write_text((660, 5), "Step: " + str(evolution_step))
+        self._draw_engine.fill_surface_with_color(((0, 0), (self._rect.width, 30)))
+        self._draw_engine.write_text((10, 5), "CA: " + "{0:.4f}".format(evolve_duration) + "s")
+        self._draw_engine.write_text((310, 5), "Display: " + "{0:.4f}".format(draw_duration) + "s")
+        self._draw_engine.write_text((660, 5), "Step: " + str(evolution_step))
 
     def _is_not_user_terminated(self):
-        return self.__draw_engine.is_active()
+        return self._draw_engine.is_active()
